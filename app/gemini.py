@@ -3,53 +3,35 @@ import json
 import re
 import time
 import wave
-import audioop
+
+try:
+    import audioop
+except ImportError:
+    import audioop_lts as audioop
 
 from google import genai
 from google.genai import types
 
-try:
-    from .config import (
-        GEMINI_API_KEY,
-        GEMINI_MODEL,
-        GEMINI_TTS_MODEL,
-        GEMINI_TTS_VOICE,
-        RECORDINGS_DIR,
-        SAMPLE_RATE,
-        CHANNELS,
-        SAMPLE_WIDTH,
-        SAVE_DEBUG_AUDIO,
-        TTS_GAIN,
-        MAX_SPOKEN_CHARS,
-    )
-    from .robot_config import (
-        ROBOT_NAME,
-        ROBOT_CREATOR,
-        ROBOT_ORGANIZATION,
-        ROBOT_PERSONALITY,
-        check_custom_qa,
-    )
-except ImportError:
-    from config import (
-        GEMINI_API_KEY,
-        GEMINI_MODEL,
-        GEMINI_TTS_MODEL,
-        GEMINI_TTS_VOICE,
-        RECORDINGS_DIR,
-        SAMPLE_RATE,
-        CHANNELS,
-        SAMPLE_WIDTH,
-        SAVE_DEBUG_AUDIO,
-        TTS_GAIN,
-        MAX_SPOKEN_CHARS,
-    )
-    from robot_config import (
-        ROBOT_NAME,
-        ROBOT_CREATOR,
-        ROBOT_ORGANIZATION,
-        ROBOT_PERSONALITY,
-        check_custom_qa,
-    )
+from .config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GEMINI_TTS_MODEL,
+    GEMINI_TTS_VOICE,
+    RECORDINGS_DIR,
+    SAMPLE_RATE,
+    CHANNELS,
+    SAMPLE_WIDTH,
+    SAVE_DEBUG_AUDIO,
+    TTS_GAIN,
+    MAX_SPOKEN_CHARS,
+)
+from .robot_config import (
+    ROBOT_NAME,
+    ROBOT_CREATOR,
+    ROBOT_ORGANIZATION,
+    ROBOT_PERSONALITY,
+    check_custom_qa,
+)
 
 
 # ============================================================

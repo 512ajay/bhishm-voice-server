@@ -3,18 +3,11 @@ import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-try:
-    from .config import WS_AUDIO_CHUNK_SIZE
-    from .gemini import (
-        understand_and_reply,
-        text_to_speech,
-    )
-except ImportError:
-    from config import WS_AUDIO_CHUNK_SIZE
-    from gemini import (
-        understand_and_reply,
-        text_to_speech,
-    )
+from .config import WS_AUDIO_CHUNK_SIZE
+from .gemini import (
+    understand_and_reply,
+    text_to_speech,
+)
 
 
 # ============================================================
