@@ -43,6 +43,7 @@ async def robot_websocket(websocket: WebSocket, robot_id: str):
     receiving_speech = False
     audio_buffer = bytearray()
     audio_chunks = 0
+    process_task: asyncio.Task | None = None
 
     try:
         while True:
@@ -69,11 +70,13 @@ async def robot_websocket(websocket: WebSocket, robot_id: str):
                     receiving_speech = False
                     pcm_data = bytes(audio_buffer)
                     total = len(pcm_data)
+                    chunks = audio_chunks
                     audio_buffer.clear()
+                    audio_chunks = 0
 
                     print(
                         f"[AUDIO] Speech ended | "
-                        f"{total} bytes | {audio_chunks} chunks"
+                        f"{total} bytes | {chunks} chunks"
                     )
 
                     if total < 1600:
@@ -86,7 +89,15 @@ async def robot_websocket(websocket: WebSocket, robot_id: str):
                         })
                         continue
 
-                    await process_speech(websocket, robot_id, pcm_data)
+                    # Keep the receive loop running so ESP32 WebSocket
+                    # pings are answered while Gemini/TTS work.
+                    if process_task and not process_task.done():
+                        print("[AUDIO] Still processing previous turn")
+                        continue
+
+                    process_task = asyncio.create_task(
+                        process_speech(websocket, robot_id, pcm_data)
+                    )
 
             # --------------------------------------------------
             # BINARY AUDIO
@@ -95,13 +106,16 @@ async def robot_websocket(websocket: WebSocket, robot_id: str):
                 if receiving_speech:
                     audio_buffer.extend(message["bytes"])
                     audio_chunks += 1
-                    # Avoid per-chunk logging (major latency on Windows)
 
     except WebSocketDisconnect:
         print(f"[DISCONNECTED] {robot_id}")
 
     except Exception as e:
         print(f"[ERROR] WebSocket error: {e}")
+
+    finally:
+        if process_task and not process_task.done():
+            process_task.cancel()
 
 
 # ============================================================
@@ -120,11 +134,12 @@ async def process_speech(
             "type": "status",
             "status": "thinking",
         })
+        print("[TX] thinking")
 
         # Run blocking Gemini work off the event loop
-        transcript, response_text = await asyncio.to_thread(
-            understand_and_reply,
-            pcm_data,
+        transcript, response_text = await asyncio.wait_for(
+            asyncio.to_thread(understand_and_reply, pcm_data),
+            timeout=45,
         )
 
         # Send text ASAP so OLED / UI update before TTS finishes
@@ -140,9 +155,9 @@ async def process_speech(
             f"(text in {time.perf_counter() - t0:.2f}s)"
         )
 
-        audio = await asyncio.to_thread(
-            text_to_speech,
-            response_text,
+        audio = await asyncio.wait_for(
+            asyncio.to_thread(text_to_speech, response_text),
+            timeout=45,
         )
 
         if not audio:
