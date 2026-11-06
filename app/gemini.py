@@ -523,17 +523,49 @@ def _audio_bytes_to_pcm16(audio_data: bytes, mime_type: str | None) -> bytes:
 # TEXT TO SPEECH
 # ============================================================
 
-def _tts_config() -> types.GenerateContentConfig:
-    return types.GenerateContentConfig(
-        response_modalities=["AUDIO"],
-        speech_config=types.SpeechConfig(
-            voice_config=types.VoiceConfig(
-                prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                    voice_name=GEMINI_TTS_VOICE,
-                )
-            )
-        ),
-    )
+def _tts_contents(spoken: str):
+    # Gemini 3.8 TTS: text is the transcript; style goes in speech_metadata.
+    return [{
+        "role": "user",
+        "parts": [{
+            "text": spoken,
+            "speech_metadata": {
+                "style": "friendly, clear, and conversational",
+            },
+        }],
+    }]
+
+
+def _tts_config() -> dict:
+    # google-genai 3.x: voice lives under speech_config.voice_config.voice
+    # (not generation_config.speechConfig.prebuiltVoiceConfig).
+    return {
+        "response_modalities": ["AUDIO"],
+        "speech_config": {
+            "voice_config": {
+                "voice": GEMINI_TTS_VOICE,
+            }
+        },
+    }
+
+
+def _extract_tts_audio(response):
+    parts = []
+
+    if getattr(response, "parts", None):
+        parts.extend(response.parts)
+
+    try:
+        parts.extend(response.candidates[0].content.parts)
+    except Exception:
+        pass
+
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline is not None and getattr(inline, "data", None):
+            return inline.data, getattr(inline, "mime_type", None)
+
+    raise RuntimeError("TTS response had no audio data")
 
 
 def text_to_speech(text: str) -> bytes:
@@ -560,7 +592,7 @@ def text_to_speech(text: str) -> bytes:
             print(f"[TTS] Model: {model_name}")
             response = client.models.generate_content(
                 model=model_name,
-                contents=spoken,
+                contents=_tts_contents(spoken),
                 config=_tts_config(),
             )
             used_model = model_name
@@ -572,9 +604,7 @@ def text_to_speech(text: str) -> bytes:
     if response is None:
         raise RuntimeError(f"TTS failed: {last_error}")
 
-    part = response.candidates[0].content.parts[0]
-    audio_data = part.inline_data.data
-    mime_type = getattr(part.inline_data, "mime_type", None)
+    audio_data, mime_type = _extract_tts_audio(response)
 
     print(
         f"[TTS] {used_model} returned "
