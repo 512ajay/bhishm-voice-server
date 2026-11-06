@@ -398,7 +398,9 @@
  
      webSocket.onEvent(webSocketEvent);
      webSocket.setReconnectInterval(3000);
-     webSocket.enableHeartbeat(15000, 3000, 2);
+     // Long Gemini/TTS turns need a patient heartbeat so the socket
+     // is not dropped while the server is still working.
+     webSocket.enableHeartbeat(45000, 8000, 4);
  
      setRobotState(STATE_CONNECTING);
  
